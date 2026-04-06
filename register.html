@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TicoAutos | Registro</title>
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+  <main class="container">
+    <h1>Registro</h1>
+
+    <form id="registerForm" class="card">
+      <div class="grid-2">
+        <label>
+          Nombre
+          <input type="text" id="name" required minlength="2" autocomplete="given-name" />
+        </label>
+
+        <label>
+          Apellido
+          <input type="text" id="lastname" required minlength="2" autocomplete="family-name" />
+        </label>
+      </div>
+
+      <label>
+        Correo
+        <input type="email" id="email" required autocomplete="email" />
+      </label>
+
+      <label>
+        Contraseña
+        <input type="password" id="password" required minlength="6" autocomplete="new-password" />
+      </label>
+
+      <button type="submit" id="btnRegister">Registrarme</button>
+
+      <p id="msg" class="msg" aria-live="polite"></p>
+
+      <p class="hint">
+        ¿Ya tienes cuenta? <a href="./login.html">Inicia sesión</a>
+      </p>
+    </form>
+  </main>
+
+  <script src="./js/register.js"></script>
+</body>
+</html>

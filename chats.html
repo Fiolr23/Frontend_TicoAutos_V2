@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TicoAutos | Chats</title>
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+  <header class="site-header shell">
+    <nav class="nav">
+      <a class="brand" href="./index.html">
+        <span class="brand-mark">T</span>
+        <span>TicoAutos</span>
+      </a>
+
+      <div class="nav-links">
+        <a class="nav-link" href="./index.html">Home</a>
+        <a class="nav-link" href="./myVehicles.html">Mis Vehiculos</a>
+        <a class="nav-link" href="./chats.html">Chats</a>
+        <a class="nav-link" href="./profile.html">Perfil</a>
+      </div>
+
+      <div class="nav-actions">
+        <button class="btn btn-danger" type="button" data-logout>Cerrar sesion</button>
+      </div>
+    </nav>
+  </header>
+
+  <main class="shell section">
+    <div class="section-head">
+      <div>
+        <h1>Chats por vehiculo</h1>
+        <p class="page-subtitle">
+          Consulta las conversaciones agrupadas por publicacion y abre el detalle de cada una.
+        </p>
+      </div>
+    </div>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>Chats como interesado</h2>
+          <p class="page-subtitle">Vehiculos sobre los que has realizado preguntas.</p>
+        </div>
+      </div>
+      <div id="buyerChatsList"></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>Chats en mis vehiculos</h2>
+          <p class="page-subtitle">Consultas recibidas en tus publicaciones.</p>
+        </div>
+      </div>
+      <div id="ownerChatsList"></div>
+    </section>
+  </main>
+
+  <script src="./js/app.js"></script>
+  <script src="./js/chats.js"></script>
+</body>
+</html>

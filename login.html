@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TicoAutos | Login</title>
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+  <main class="container">
+    <h1>Login</h1>
+
+    <form id="loginForm" class="card">
+      <label>
+        Correo
+        <input type="email" id="email" required />
+      </label>
+
+      <label>
+        Contraseña
+        <input type="password" id="password" required />
+      </label>
+
+      <button type="submit" id="btnLogin">Iniciar sesión</button>
+
+      <p id="msg" class="msg" aria-live="polite"></p>
+
+      <p class="hint">
+       ¿No tienes cuenta? <a href="./register.html">Regístrate</a>
+      </p>
+    </form>
+  </main>
+
+  <script src="./js/login.js"></script>
+</body>
+</html>

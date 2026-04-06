@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TicoAutos | Catalogo</title>
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+  <header class="site-header shell">
+    <nav class="nav">
+      <a class="brand" href="./index.html">
+        <span class="brand-mark">T</span>
+        <span>TicoAutos</span>
+      </a>
+
+      <div class="nav-links">
+        <a class="nav-link" href="./index.html">Home</a>
+        <a class="nav-link" href="./index.html#catalogo">Vehiculos</a>
+        <a class="nav-link" href="./createVehicle.html" data-auth="private">Publicar Vehiculo</a>
+        <a class="nav-link" href="./myVehicles.html" data-auth="private">Mis Vehiculos</a>
+        <a class="nav-link" href="./profile.html" data-auth="private">Perfil</a>
+        <a class="nav-link" href="./chats.html" data-auth="private">Chats</a>
+      </div>
+
+      <div class="nav-actions">
+        <span class="user-chip" data-user-label>Invitado</span>
+        <a class="btn btn-outline" href="./login.html" data-auth="guest">Login</a>
+        <a class="btn btn-primary" href="./register.html" data-auth="guest">Crear cuenta</a>
+        <button class="btn btn-danger" type="button" data-auth="private" data-logout>Cerrar sesion</button>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero shell">
+      <div class="hero-copy">
+        <span class="eyebrow">Compra y vende facil</span>
+        <h1>Encuentra tu proximo vehiculo en TicoAutos</h1>
+        <p class="page-subtitle">
+          Consulta publicaciones activas, revisa detalles y administra tus propios anuncios desde una sola plataforma.
+        </p>
+        <div class="inline-actions">
+          <a class="btn btn-primary" href="#catalogo">Explorar catalogo</a>
+          <a class="btn btn-outline" href="./createVehicle.html" data-auth="private">Publicar ahora</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="shell section" id="catalogo">
+      <div class="section-head">
+        <div>
+          <h2>Catalogo</h2>
+          <p class="page-subtitle" id="catalogSummary">Consulta las publicaciones disponibles</p>
+        </div>
+      </div>
+
+      <form class="filter-card" id="catalogFilters">
+        <input type="text" name="brand" placeholder="Marca" />
+        <input type="text" name="model" placeholder="Modelo" />
+        <input type="number" name="minYear" placeholder="Ano minimo" />
+        <input type="number" name="maxYear" placeholder="Ano maximo" />
+        <input type="number" name="minPrice" placeholder="Precio minimo" />
+        <input type="number" name="maxPrice" placeholder="Precio maximo" />
+        <select name="status">
+          <option value="">Todos los estados</option>
+          <option value="disponible">Disponible</option>
+          <option value="vendido">Vendido</option>
+        </select>
+        <div class="inline-actions">
+          <button class="btn btn-primary" type="submit">Filtrar</button>
+          <button class="btn btn-outline" type="reset">Limpiar</button>
+        </div>
+      </form>
+
+      <div class="catalog-grid" id="catalogList"></div>
+    </section>
+  </main>
+
+  <script src="./js/app.js"></script>
+  <script src="./js/index.js"></script>
+</body>
+</html>

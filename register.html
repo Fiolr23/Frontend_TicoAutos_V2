@@ -11,15 +11,37 @@
     <h1>Registro</h1>
 
     <form id="registerForm" class="card">
+      <label>
+        Cédula
+        <input
+          type="text"
+          id="cedula"
+          required
+          minlength="9"
+          maxlength="9"
+          inputmode="numeric"
+          autocomplete="off"
+        />
+      </label>
+
+      <!-- Este botón consulta MI backend, no el padrón directo. -->
+      <button type="button" id="btnValidateCedula">Validar cédula</button>
+
+      <label>
+        Nombre
+        <!-- Se autocompleta desde la respuesta del backend después de validar la cédula. -->
+        <input type="text" id="name" required minlength="2" autocomplete="given-name" readonly />
+      </label>
+
       <div class="grid-2">
         <label>
-          Nombre
-          <input type="text" id="name" required minlength="2" autocomplete="given-name" />
+          Apellido paterno
+          <input type="text" id="apellidoPaterno" required minlength="2" readonly />
         </label>
 
         <label>
-          Apellido
-          <input type="text" id="lastname" required minlength="2" autocomplete="family-name" />
+          Apellido materno
+          <input type="text" id="apellidoMaterno" required minlength="2" readonly />
         </label>
       </div>
 

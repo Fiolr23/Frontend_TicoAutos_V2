@@ -1,11 +1,18 @@
+// URL base del backend
 const API_BASE = "http://localhost:3000";
+
+// Client ID de Google para usar Google Identity Services
+const GOOGLE_CLIENT_ID = "270207719324-1bpt318s19001riv71k658umgigqkji2.apps.googleusercontent.com";
 
 // Referencias a elementos del DOM
 const form = document.getElementById("registerForm");
 const msg = document.getElementById("msg");
 const btnRegister = document.getElementById("btnRegister");
 const btnValidateCedula = document.getElementById("btnValidateCedula");
+const googleRegisterBtn = document.getElementById("googleRegisterBtn");
+const googleModeHint = document.getElementById("googleModeHint");
 
+// Inputs del formulario
 const cedulaInput = document.getElementById("cedula");
 const nameInput = document.getElementById("name");
 const apellidoPaternoInput = document.getElementById("apellidoPaterno");
@@ -13,21 +20,31 @@ const apellidoMaternoInput = document.getElementById("apellidoMaterno");
 const emailInput = document.getElementById("email");
 const passwordInput = document.getElementById("password");
 
-// Guarda la cédula que ya fue validada correctamente
+// Grupos para ocultar/mostrar email y password
+const emailGroup = emailInput.closest("label");
+const passwordGroup = passwordInput.closest("label");
+
+// Clave para guardar temporalmente credencial de Google
+const PENDING_GOOGLE_CREDENTIAL_KEY = "pendingGoogleCredential";
+
+// Variable para guardar la cédula ya validada
 let validatedCedula = "";
 
-// Muestra mensajes al usuario (éxito o error)
+// Se obtiene si hay un login con Google pendiente
+let pendingGoogleCredential = sessionStorage.getItem(PENDING_GOOGLE_CREDENTIAL_KEY) || "";
+
+// Función para mostrar mensajes al usuario
 function setMsg(text, type) {
-  msg.textContent = text; // Texto visible
-  msg.className = `msg ${type || ""}`; // Clase CSS para estilos
+  msg.textContent = text;
+  msg.className = `msg ${type || ""}`;
 }
 
-// Limpia los datos autocompletados del padrón
+// Limpia los datos obtenidos del padrón si la cédula cambia
 function clearPadronFields() {
   nameInput.value = "";
   apellidoPaternoInput.value = "";
   apellidoMaternoInput.value = "";
-  validatedCedula = ""; // Invalida la cédula validada
+  validatedCedula = "";
 }
 
 // Valida que la cédula tenga exactamente 9 dígitos
@@ -35,77 +52,219 @@ function isValidCedula(cedula) {
   return /^\d{9}$/.test(cedula);
 }
 
-// Evento que se ejecuta cuando el usuario escribe en la cédula
+// Guarda la sesión del usuario (token + id)
+function saveAuthSession(data) {
+  sessionStorage.setItem("token", data.token);
+
+  if (data.user?.id) {
+    sessionStorage.setItem("userId", data.user.id);
+  }
+}
+
+// Guarda la credencial de Google temporalmente (antes de validar cédula)
+function savePendingGoogle(credential) {
+  pendingGoogleCredential = credential;
+
+  sessionStorage.setItem(PENDING_GOOGLE_CREDENTIAL_KEY, pendingGoogleCredential);
+}
+
+// Limpia el estado de Google pendiente
+function clearPendingGoogle() {
+  pendingGoogleCredential = "";
+
+  sessionStorage.removeItem(PENDING_GOOGLE_CREDENTIAL_KEY);
+}
+
+// Determina si estamos en modo Google (ya autenticado con Google)
+function isGoogleMode() {
+  return Boolean(pendingGoogleCredential);
+}
+
+// Cambia el texto del botón dependiendo del modo
+function getRegisterButtonText() {
+  return isGoogleMode() ? "Completar registro con Google" : "Registrarme";
+}
+
+// Activa el modo Google:
+// aquí se ocultan email y contraseña porque Google ya los proporciona
+function enableGoogleMode() {
+  // Con Google no se pide correo ni contraseña nuevamente
+  emailInput.value = "";
+  emailInput.required = false;
+  emailInput.readOnly = true;
+  emailGroup.hidden = true;
+  emailGroup.style.display = "none";
+
+  passwordInput.value = "";
+  passwordInput.required = false;
+  passwordGroup.hidden = true;
+  passwordGroup.style.display = "none";
+
+  // Cambia texto del botón
+  btnRegister.textContent = getRegisterButtonText();
+
+  // Muestra mensaje explicativo al usuario
+  googleModeHint.hidden = false;
+  googleModeHint.textContent =
+    "Tu cuenta de Google ya fue verificada. Ahora valida la cedula para completar el registro.";
+}
+
+// Desactiva modo Google (registro normal)
+function disableGoogleMode() {
+  emailInput.readOnly = false;
+  emailInput.required = true;
+  emailGroup.hidden = false;
+  emailGroup.style.display = "";
+  passwordInput.required = true;
+  passwordGroup.hidden = false;
+  passwordGroup.style.display = "";
+  googleModeHint.hidden = true;
+  btnRegister.textContent = getRegisterButtonText();
+}
+
+// Si ya venimos de Google, activa ese modo automáticamente
+if (isGoogleMode()) {
+  enableGoogleMode();
+} else {
+  disableGoogleMode();
+}
+
+// Evento cuando se escribe en la cédula
 cedulaInput.addEventListener("input", () => {
-  // Elimina todo lo que no sean números y limita a 9 dígitos
+  // Solo permite números y máximo 9 dígitos
   const onlyDigits = cedulaInput.value.replace(/\D/g, "").slice(0, 9);
 
-  // Si el valor cambió, se reemplaza automáticamente
   if (cedulaInput.value !== onlyDigits) {
     cedulaInput.value = onlyDigits;
   }
 
-  // Si ya había una cédula validada y el usuario la cambia
-  // se limpian los datos y se invalida la validación
+  // Si la cédula cambia, se limpian los datos validados
   if (validatedCedula && validatedCedula !== onlyDigits) {
     clearPadronFields();
   }
 });
 
-// Evento del botón "Validar cédula"
+// Botón para validar cédula contra el API (padrón)
 btnValidateCedula.addEventListener("click", async () => {
   const cedula = cedulaInput.value.trim();
 
-  // Validación básica de formato
+  // Validación básica
   if (!isValidCedula(cedula)) {
     clearPadronFields();
-    return setMsg("La cédula debe tener exactamente 9 dígitos", "err");
+    return setMsg("La cedula debe tener exactamente 9 digitos", "err");
   }
 
-  // Desactiva el botón mientras se valida
   btnValidateCedula.disabled = true;
   btnValidateCedula.textContent = "Validando...";
 
   try {
-    // El frontend llama al backend (no directamente al padrón)
+    // Llama al backend que consulta el padrón
     const resp = await fetch(
       `${API_BASE}/api/users/validate-cedula?cedula=${encodeURIComponent(cedula)}`
     );
 
-    // Intenta convertir la respuesta a JSON
     const data = await resp.json().catch(() => ({}));
 
-    // Si el backend responde con error
     if (!resp.ok) {
       clearPadronFields();
-      return setMsg(data.message || "No se pudo validar la cédula", "err");
+      return setMsg(data.message || "No se pudo validar la cedula", "err");
     }
 
-    // Autocompleta los campos con datos del padrón
+    // Autocompleta datos desde el padrón
     nameInput.value = data.nombre || "";
     apellidoPaternoInput.value = data.apellidoPaterno || "";
     apellidoMaternoInput.value = data.apellidoMaterno || "";
 
-    // Guarda la cédula validada
     validatedCedula = `${data.cedula || cedula}`.trim();
 
-    setMsg("Cédula validada correctamente.", "ok");
+    setMsg("Cedula validada correctamente.", "ok");
   } catch (_error) {
-    // Error de conexión con el servidor
     clearPadronFields();
-    setMsg("No se pudo conectar con el servidor para validar la cédula", "err");
+    setMsg("No se pudo conectar con el servidor para validar la cedula", "err");
   } finally {
-    // Reactiva el botón
     btnValidateCedula.disabled = false;
-    btnValidateCedula.textContent = "Validar cédula";
+    btnValidateCedula.textContent = "Validar cedula";
   }
 });
 
-// Evento al enviar el formulario de registro
-form.addEventListener("submit", async (e) => {
-  e.preventDefault(); // Evita recargar la página
+// Maneja respuesta de Google
+async function handleGoogleResponse(response) {
+  setMsg("");
 
-  // Obtiene valores del formulario
+  try {
+    // Se envía el credential al backend
+    const resp = await fetch(`${API_BASE}/api/auth/google`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credential: response.credential }),
+    });
+
+    const data = await resp.json().catch(() => ({}));
+
+    if (!resp.ok) {
+      return setMsg(data.message || "No se pudo continuar con Google", "err");
+    }
+
+    // Caso: ya existe → login directo
+    if (data.token) {
+      clearPendingGoogle();
+      saveAuthSession(data);
+
+      setMsg("Login con Google exitoso", "ok");
+
+      setTimeout(() => {
+        window.location.href = "./index.html";
+      }, 800);
+
+      return;
+    }
+
+    // Caso: necesita validar cédula
+    if (data.needsCedula) {
+      savePendingGoogle(response.credential);
+
+      // Activa modo Google (oculta email/password)
+      enableGoogleMode();
+
+      setMsg("Cuenta de Google verificada. Ahora valida la cedula para registrarte.", "ok");
+    }
+  } catch (error) {
+    console.error("Error en Google register:", error);
+    setMsg("No se pudo conectar con el servidor", "err");
+  }
+}
+
+// Inicializa el botón de Google
+function initGoogleRegister() {
+  if (GOOGLE_CLIENT_ID === "TU_CLIENT_ID_DE_GOOGLE") {
+    setMsg("Falta configurar el Client ID de Google en register.js", "err");
+    return;
+  }
+
+  if (!window.google?.accounts?.id) {
+    setMsg("No se pudo cargar Google Identity Services", "err");
+    return;
+  }
+
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: handleGoogleResponse,
+  });
+
+  google.accounts.id.renderButton(googleRegisterBtn, {
+    theme: "outline",
+    size: "large",
+    text: "signup_with",
+    shape: "rectangular",
+    locale: "es",
+  });
+}
+
+// Evento de submit del formulario
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  // Obtiene datos
   const cedula = cedulaInput.value.trim();
   const name = nameInput.value.trim();
   const apellidoPaterno = apellidoPaternoInput.value.trim();
@@ -113,60 +272,86 @@ form.addEventListener("submit", async (e) => {
   const email = emailInput.value.trim();
   const password = passwordInput.value;
 
-  // Validaciones básicas
+  // Validaciones
   if (!isValidCedula(cedula)) {
-    return setMsg("La cédula debe tener exactamente 9 dígitos", "err");
+    return setMsg("La cedula debe tener exactamente 9 digitos", "err");
   }
 
-  // Verifica que la cédula haya sido validada previamente
   if (validatedCedula !== cedula) {
-    return setMsg("Debes validar la cédula antes de registrarte", "err");
+    return setMsg("Debes validar la cedula antes de registrarte", "err");
   }
 
   if (name.length < 2) return setMsg("Nombre muy corto", "err");
   if (apellidoPaterno.length < 2) return setMsg("Apellido paterno muy corto", "err");
   if (apellidoMaterno.length < 2) return setMsg("Apellido materno muy corto", "err");
-  if (!email.includes("@")) return setMsg("Correo inválido", "err");
-  if (password.length < 6) return setMsg("Contraseña mínima 6 caracteres", "err");
 
-  // Desactiva botón para evitar doble envío
+  // En modo normal sí se valida email
+  if (!isGoogleMode() && !email.includes("@")) return setMsg("Correo invalido", "err");
+
+  // En modo normal sí se valida contraseña
+  if (!isGoogleMode() && password.length < 6) {
+    return setMsg("Contrasena minima 6 caracteres", "err");
+  }
+
   btnRegister.disabled = true;
-  btnRegister.textContent = "Registrando...";
+  btnRegister.textContent = "Procesando...";
 
   try {
-    // Petición POST al backend para registrar usuario
-    const resp = await fetch(`${API_BASE}/api/users/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    let resp;
 
-      // Solo se envían estos datos
-      // El backend completa nombre y apellidos desde el padrón
-      body: JSON.stringify({ cedula, email, password }),
-    });
+    // Registro normal
+    if (!isGoogleMode()) {
+      resp = await fetch(`${API_BASE}/api/users/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cedula, email, password }),
+      });
+    } 
+    // Registro con Google (solo cedula + credential)
+    else {
+      resp = await fetch(`${API_BASE}/api/users/register-google`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cedula,
+          credential: pendingGoogleCredential,
+        }),
+      });
+    }
 
     const data = await resp.json().catch(() => ({}));
 
-    // Si el backend devuelve error
     if (!resp.ok) {
       return setMsg(data.message || "Error en registro", "err");
     }
 
-    // Registro exitoso
-    setMsg("Registro exitoso.");
+    // Registro normal → va a login
+    if (!isGoogleMode()) {
+      setMsg("Registro exitoso.", "ok");
+      sessionStorage.setItem("lastEmail", email);
 
-    // Guarda el correo para usarlo después (ej: login)
-    sessionStorage.setItem("lastEmail", email);
+      setTimeout(() => {
+        window.location.href = "./login.html";
+      }, 1000);
+    } 
+    // Registro con Google → login directo
+    else {
+      clearPendingGoogle();
+      saveAuthSession(data);
 
-    // Redirige al login después de 1 segundo
-    setTimeout(() => {
-      window.location.href = "./login.html";
-    }, 1000);
+      setMsg("Registro con Google exitoso", "ok");
+
+      setTimeout(() => {
+        window.location.href = "./index.html";
+      }, 800);
+    }
   } catch (_error) {
-    // Error de conexión con el servidor
     setMsg("No se pudo conectar con el servidor", "err");
   } finally {
-    // Reactiva el botón
     btnRegister.disabled = false;
-    btnRegister.textContent = "Registrarme";
+    btnRegister.textContent = getRegisterButtonText();
   }
 });
+
+// Inicializa Google
+initGoogleRegister();

@@ -11,8 +11,12 @@
     <h1>Registro</h1>
 
     <form id="registerForm" class="card">
+      <p class="hint">Tambien puedes empezar con Google</p>
+      <div id="googleRegisterBtn"></div>
+      <p id="googleModeHint" class="hint" hidden></p>
+
       <label>
-        Cédula
+        Cedula
         <input
           type="text"
           id="cedula"
@@ -24,12 +28,10 @@
         />
       </label>
 
-      <!-- Este botón consulta MI backend, no el padrón directo. -->
-      <button type="button" id="btnValidateCedula">Validar cédula</button>
+      <button type="button" id="btnValidateCedula">Validar cedula</button>
 
       <label>
         Nombre
-        <!-- Se autocompleta desde la respuesta del backend después de validar la cédula. -->
         <input type="text" id="name" required minlength="2" autocomplete="given-name" readonly />
       </label>
 
@@ -51,7 +53,7 @@
       </label>
 
       <label>
-        Contraseña
+        Contrasena
         <input type="password" id="password" required minlength="6" autocomplete="new-password" />
       </label>
 
@@ -60,11 +62,12 @@
       <p id="msg" class="msg" aria-live="polite"></p>
 
       <p class="hint">
-        ¿Ya tienes cuenta? <a href="./login.html">Inicia sesión</a>
+        Ya tienes cuenta? <a href="./login.html">Inicia sesion</a>
       </p>
     </form>
   </main>
 
+  <script src="https://accounts.google.com/gsi/client"></script>
   <script src="./js/register.js"></script>
 </body>
 </html>

@@ -17,20 +17,24 @@
       </label>
 
       <label>
-        Contraseña
+        Contrasena
         <input type="password" id="password" required />
       </label>
 
-      <button type="submit" id="btnLogin">Iniciar sesión</button>
+      <button type="submit" id="btnLogin">Iniciar sesion</button>
+
+      <p class="hint">o entra con Google</p>
+      <div id="googleLoginBtn"></div>
 
       <p id="msg" class="msg" aria-live="polite"></p>
 
       <p class="hint">
-       ¿No tienes cuenta? <a href="./register.html">Regístrate</a>
+        No tienes cuenta? <a href="./register.html">Registrate</a>
       </p>
     </form>
   </main>
 
+  <script src="https://accounts.google.com/gsi/client"></script>
   <script src="./js/login.js"></script>
 </body>
 </html>

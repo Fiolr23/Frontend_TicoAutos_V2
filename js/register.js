@@ -2,7 +2,7 @@
 const API_BASE = "http://localhost:3000";
 
 // Client ID de Google para usar Google Identity Services
-const GOOGLE_CLIENT_ID = "270207719324-1bpt318s19001riv71k658umgigqkji2.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "768296011477-csncaoc4p90t2ra4b3kjtmts59n1o68r.apps.googleusercontent.com";
 
 // Referencias a elementos del DOM
 const form = document.getElementById("registerForm");
@@ -325,15 +325,21 @@ form.addEventListener("submit", async (e) => {
       return setMsg(data.message || "Error en registro", "err");
     }
 
-    // Registro normal → va a login
+    // Si el registro es normal, no hace login directo.
+    // Solo muestra mensaje y manda al login para que luego revise el correo.
     if (!isGoogleMode()) {
-      setMsg("Registro exitoso.", "ok");
+      // Muestra el mensaje del backend o uno por defecto.
+      setMsg(data.message || "Registro exitoso. Revisa tu correo para activar la cuenta.", "ok");
+
+      // Guarda el correo para mejorar la experiencia en login.
       sessionStorage.setItem("lastEmail", email);
 
+      // Redirige al login después de un pequeño tiempo.
       setTimeout(() => {
+        // Envía al usuario a la pantalla de login.
         window.location.href = "./login.html";
-      }, 1000);
-    } 
+      }, 1500);
+    }
     // Registro con Google → login directo
     else {
       clearPendingGoogle();

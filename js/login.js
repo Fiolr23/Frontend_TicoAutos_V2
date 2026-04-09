@@ -2,7 +2,7 @@
 const API_BASE = "http://localhost:3000";
 
 // Client ID de Google necesario para usar Google Identity Services
-const GOOGLE_CLIENT_ID = "270207719324-1bpt318s19001riv71k658umgigqkji2.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "768296011477-csncaoc4p90t2ra4b3kjtmts59n1o68r.apps.googleusercontent.com";
 
 // Referencias a elementos del DOM (formulario, mensajes, botones)
 const form = document.getElementById("loginForm");
@@ -18,6 +18,51 @@ function setMsg(text, type) {
   msg.textContent = text;
   msg.className = `msg ${type || ""}`.trim();
 }
+
+// Muestra mensajes cuando el usuario vuelve desde el link de verificacion
+function showVerificationMessageFromUrl() {
+  // Lee los parametros de la URL actual
+  const params = new URLSearchParams(window.location.search);
+
+  // Obtiene si la verificacion fue exitosa o no
+  const verified = params.get("verified");
+
+  // Obtiene la razon del error si existe
+  const reason = params.get("reason");
+
+  // Si verified vale 1, muestra mensaje de exito
+  if (verified === "1") {
+    setMsg("Correo verificado correctamente. Ya puedes iniciar sesion.", "ok");
+  }
+
+  // Si verified vale 0, muestra el error correspondiente
+  if (verified === "0") {
+    // Mensaje por defecto
+    let message = "No se pudo verificar el correo.";
+
+    // Si falta el token en la URL
+    if (reason === "missing") {
+      message = "El enlace de verificacion es invalido.";
+    }
+    // Si el token no existe, ya fue usado o no coincide
+    else if (reason === "invalid") {
+      message = "El token de verificacion no existe, ya fue usado o no es valido.";
+    }
+    // Si el token ya vencio
+    else if (reason === "expired") {
+      message = "El enlace de verificacion vencio.";
+    }
+
+    // Muestra el mensaje final
+    setMsg(message, "err");
+  }
+
+  // Limpia la URL para que el mensaje no se repita al recargar
+  if (verified) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+}
+
 
 // Guarda la sesión del usuario en el navegador (token + userId)
 function saveAuthSession(data) {
@@ -178,6 +223,9 @@ form.addEventListener("submit", async (e) => {
     btn.textContent = "Iniciar sesion";
   }
 });
+
+// Revisa si venimos del link de verificacion y muestra el mensaje correspondiente
+showVerificationMessageFromUrl();
 
 // Inicializa Google Login al cargar la página
 initGoogleLogin();

@@ -5,6 +5,32 @@ window.TicoAutos.bindNavigation();
 const params = new URLSearchParams(window.location.search);
 const vehicleId = params.get("id");
 const container = document.getElementById("vehicleDetail");
+const VEHICLE_QUERY = `
+  query GetVehicle($id: ID!) {
+    vehicle(id: $id) {
+      id
+      userId
+      brand
+      model
+      year
+      price
+      color
+      mileage
+      transmission
+      fuelType
+      location
+      description
+      status
+      images
+      owner {
+        id
+        name
+        lastname
+        email
+      }
+    }
+  }
+`;
 
 // Si no existe id de vehículo, muestra un mensaje de error.
 if (!vehicleId) {
@@ -59,19 +85,19 @@ const bindGallery = (images) => {
 // Carga el detalle del vehículo desde el backend.
 const loadVehicleDetail = async () => {
   try {
-    const response = await fetch(`${window.TicoAutos.API_BASE}/api/vehicles/${vehicleId}`);
-    const vehicle = await response.json().catch(() => ({}));
+    const data = await window.TicoAutos.graphqlRequest(VEHICLE_QUERY, { id: vehicleId });
+    const vehicle = data.vehicle;
 
-    // Valida si la respuesta del servidor fue exitosa.
-    if (!response.ok) {
-      throw new Error(vehicle.message || "No fue posible cargar la informacion del vehiculo.");
+    if (!vehicle) {
+      throw new Error("No fue posible cargar la informacion del vehiculo.");
     }
 
-    const owner = vehicle.owner || vehicle.userId;
+    const owner = vehicle.owner || null;
+    const realVehicleId = window.TicoAutos.getEntityId(vehicle);
 
     // Obtiene el usuario actual para determinar si es el propietario.
     const currentUserId = await window.TicoAutos.syncSessionUser();
-    const isOwner = currentUserId === owner?._id;
+    const isOwner = currentUserId === (owner?.id || vehicle.userId);
 
     // Define clase visual según estado del vehículo.
     const statusClass = vehicle.status === "vendido" ? "sold" : "available";
@@ -118,8 +144,8 @@ const loadVehicleDetail = async () => {
             <a class="btn btn-primary" href="./index.html">Volver al catalogo</a>
             ${
               isOwner
-                ? `<a class="btn btn-outline" href="./editVehicle.html?id=${vehicle._id}">Editar publicacion</a>`
-                : `<a class="btn btn-outline" href="./chat.html?vehicleId=${vehicle._id}">Enviar mensaje</a>`
+                ? `<a class="btn btn-outline" href="./editVehicle.html?id=${realVehicleId}">Editar publicacion</a>`
+                : `<a class="btn btn-outline" href="./chat.html?vehicleId=${realVehicleId}">Enviar mensaje</a>`
             }
           </div>
         </aside>

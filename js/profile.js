@@ -6,6 +6,16 @@ window.TicoAutos.bindNavigation();
 
 const profileCard = document.getElementById("profileCard");
 const profileStats = document.getElementById("profileStats");
+const MY_VEHICLES_QUERY = `
+  query GetMyVehicles($limit: Int) {
+    vehicles(mine: true, limit: $limit) {
+      vehicles {
+        id
+        status
+      }
+    }
+  }
+`;
 
 // GET /api/auth/me
 const fetchCurrentUser = async () => {
@@ -23,16 +33,11 @@ const fetchCurrentUser = async () => {
 
 // GET /api/vehicles/mine
 const fetchMyVehicles = async () => {
-  const response = await fetch(`${window.TicoAutos.API_BASE}/api/vehicles/mine?limit=50`, {
-    headers: window.TicoAutos.getAuthHeaders(),
-  });
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new Error(data.message || "No se pudieron cargar tus vehiculos");
-  }
-
-  return data;
+  return window.TicoAutos.graphqlRequest(
+    MY_VEHICLES_QUERY,
+    { limit: 50 },
+    { auth: true }
+  );
 };
 
 // Carga perfil y resumen de publicaciones del usuario autenticado.
@@ -45,7 +50,7 @@ const loadProfile = async () => {
 
     window.TicoAutos.setSessionUser(meData.user);
 
-    const vehicles = vehiclesData.results || [];
+    const vehicles = vehiclesData.vehicles?.vehicles || [];
     const soldCount = vehicles.filter((vehicle) => vehicle.status === "vendido").length;
     const availableCount = vehicles.length - soldCount;
 

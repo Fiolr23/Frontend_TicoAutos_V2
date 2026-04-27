@@ -1,4 +1,5 @@
 const API_BASE = "http://localhost:3000";
+const GRAPHQL_URL = `${API_BASE}/graphql`;
 const PLACEHOLDER_IMAGE =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 520'%3E%3Crect width='800' height='520' fill='%230e2433'/%3E%3Cpath d='M145 330h40l38-92h257l56 92h84' fill='none' stroke='%23f4c95d' stroke-width='18' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='250' cy='350' r='34' fill='%23f4c95d'/%3E%3Ccircle cx='542' cy='350' r='34' fill='%23f4c95d'/%3E%3Ctext x='50%25' y='120' dominant-baseline='middle' text-anchor='middle' fill='white' font-family='Verdana' font-size='42'%3ETicoAutos%3C/text%3E%3C/svg%3E";
 
@@ -23,6 +24,7 @@ const escapeHtml = (value = "") =>
 const getToken = () => sessionStorage.getItem("token");
 const getUserId = () => sessionStorage.getItem("userId");
 const isAuthenticated = () => Boolean(getToken());
+const getEntityId = (value) => value?.id || value?._id || "";
 
 // Guarda el id del usuario para no pedirlo en cada vista.
 const setSessionUser = (user) => {
@@ -36,6 +38,32 @@ const setSessionUser = (user) => {
 const getAuthHeaders = (headers = {}) => {
   const token = getToken();
   return token ? { ...headers, Authorization: `Bearer ${token}` } : headers;
+};
+
+// Hace una consulta simple a /graphql con o sin token.
+const graphqlRequest = async (query, variables = {}, options = {}) => {
+  const headers = { "Content-Type": "application/json" };
+
+  if (options.auth) {
+    Object.assign(headers, getAuthHeaders());
+  }
+
+  const response = await fetch(GRAPHQL_URL, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ query, variables }),
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(payload?.errors?.[0]?.message || "No se pudo consultar GraphQL");
+  }
+
+  if (payload.errors?.length) {
+    throw new Error(payload.errors[0].message || "No se pudo consultar GraphQL");
+  }
+
+  return payload.data || {};
 };
 
 // Sincroniza el usuario autenticado usando GET /api/auth/me.
@@ -98,7 +126,7 @@ const getVehicleDetailUrl = (vehicleId) => {
 
 // Permite compartir la url del vehiculo desde el catalogo o detalle.
 const shareVehicleLink = async (vehicle) => {
-  const shareUrl = getVehicleDetailUrl(vehicle._id);
+  const shareUrl = getVehicleDetailUrl(getEntityId(vehicle));
 
   try {
     if (navigator.clipboard?.writeText) {
@@ -180,9 +208,10 @@ const createVehicleCard = (vehicle, options = {}) => {
     : vehicle.userId
       ? `${vehicle.userId.name} ${vehicle.userId.lastname}`
       : "Sin propietario";
+  const vehicleId = getEntityId(vehicle);
 
   card.innerHTML = `
-    <a class="vehicle-card-media" href="./vehicle.html?id=${vehicle._id}">
+    <a class="vehicle-card-media" href="./vehicle.html?id=${vehicleId}">
       <img src="${getVehicleImage(vehicle)}" alt="${escapeHtml(vehicle.brand)} ${escapeHtml(vehicle.model)}" />
       <span class="vehicle-badge ${vehicle.status === "vendido" ? "sold" : ""}">
         ${statusLabel}
@@ -208,7 +237,7 @@ const createVehicleCard = (vehicle, options = {}) => {
       }
       <p class="vehicle-description">${escapeHtml(description)}</p>
       <div class="vehicle-card-actions">
-        <a class="btn btn-outline" href="./vehicle.html?id=${vehicle._id}">Ver detalle</a>
+        <a class="btn btn-outline" href="./vehicle.html?id=${vehicleId}">Ver detalle</a>
       </div>
     </div>
   `;
@@ -265,6 +294,7 @@ const createCatalogVehicleCard = (vehicle, options = {}) => {
   const statusLabel = vehicle.status === "vendido" ? "Vendido" : "Disponible";
   const statusClass = vehicle.status === "vendido" ? "sold" : "available";
   const description = truncateText(vehicle.description || "Vehiculo disponible para consulta.", 68);
+  const vehicleId = getEntityId(vehicle);
   const ownerActions = isOwner
     ? `
       <div class="catalog-owner-actions">
@@ -284,7 +314,7 @@ const createCatalogVehicleCard = (vehicle, options = {}) => {
     `;
 
   card.innerHTML = `
-    <a class="catalog-card-media" href="./vehicle.html?id=${vehicle._id}">
+    <a class="catalog-card-media" href="./vehicle.html?id=${vehicleId}">
       <img src="${getVehicleImage(vehicle)}" alt="${escapeHtml(vehicle.brand)} ${escapeHtml(vehicle.model)}" />
       <span class="catalog-status ${statusClass}">${statusLabel}</span>
     </a>
@@ -303,7 +333,7 @@ const createCatalogVehicleCard = (vehicle, options = {}) => {
       </div>
       <p class="catalog-description">${escapeHtml(description)}</p>
       <div class="catalog-detail-action">
-        <a class="btn btn-outline" href="./vehicle.html?id=${vehicle._id}">Ver detalle</a>
+        <a class="btn btn-outline" href="./vehicle.html?id=${vehicleId}">Ver detalle</a>
       </div>
       ${ownerActions}
     </div>
@@ -325,6 +355,7 @@ const createCatalogVehicleCard = (vehicle, options = {}) => {
 // API publica de utilidades compartidas por el frontend.
 window.TicoAutos = {
   API_BASE,
+  GRAPHQL_URL,
   bindNavigation,
   buildImageUrl,
   createCatalogVehicleCard,
@@ -332,8 +363,10 @@ window.TicoAutos = {
   escapeHtml,
   formatCurrency,
   getAuthHeaders,
+  getEntityId,
   getToken,
   getUserId,
+  graphqlRequest,
   isAuthenticated,
   logout,
   setSessionUser,

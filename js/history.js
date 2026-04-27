@@ -9,6 +9,41 @@ const conversationId = params.get("conversationId");
 
 const historyHeader = document.getElementById("historyHeader");
 const historyContent = document.getElementById("historyContent");
+const CONVERSATION_QUERY = `
+  query GetConversation($id: ID!) {
+    conversation(id: $id) {
+      id
+      vehicle {
+        id
+        brand
+        model
+      }
+      otherUser {
+        id
+        name
+        lastname
+      }
+      results {
+        id
+        questionText
+        answerText
+        status
+        askedAt
+        answeredAt
+        askedByUser {
+          id
+          name
+          lastname
+        }
+        answeredByUser {
+          id
+          name
+          lastname
+        }
+      }
+    }
+  }
+`;
 
 const formatDate = (value) => {
   if (!value) {
@@ -26,8 +61,8 @@ const renderHistoryItem = (question) => `
     <p><strong>Pregunta:</strong> ${window.TicoAutos.escapeHtml(question.questionText)}</p>
     <p class="muted">
       Interesado:
-      ${window.TicoAutos.escapeHtml(question.askedByUserId?.name || "")}
-      ${window.TicoAutos.escapeHtml(question.askedByUserId?.lastname || "")}
+      ${window.TicoAutos.escapeHtml(question.askedByUser?.name || "")}
+      ${window.TicoAutos.escapeHtml(question.askedByUser?.lastname || "")}
     </p>
     <p class="muted">Fecha de pregunta: ${formatDate(question.askedAt)}</p>
 
@@ -37,8 +72,8 @@ const renderHistoryItem = (question) => `
           <p><strong>Respuesta:</strong> ${window.TicoAutos.escapeHtml(question.answerText)}</p>
           <p class="muted">
             Propietario:
-            ${window.TicoAutos.escapeHtml(question.answeredByUserId?.name || "")}
-            ${window.TicoAutos.escapeHtml(question.answeredByUserId?.lastname || "")}
+            ${window.TicoAutos.escapeHtml(question.answeredByUser?.name || "")}
+            ${window.TicoAutos.escapeHtml(question.answeredByUser?.lastname || "")}
           </p>
           <p class="muted">Fecha de respuesta: ${formatDate(question.answeredAt)}</p>
         `
@@ -47,6 +82,7 @@ const renderHistoryItem = (question) => `
   </article>
 `;
 
+// Carga el historial desde /graphql.
 const loadHistory = async () => {
   if (!conversationId) {
     historyHeader.innerHTML = '<div class="empty-state">No fue posible identificar el historial solicitado.</div>';
@@ -58,21 +94,20 @@ const loadHistory = async () => {
   historyContent.innerHTML = "";
 
   try {
-    const response = await fetch(
-      `${window.TicoAutos.API_BASE}/api/questions/conversations/${conversationId}/messages`,
-      {
-        headers: window.TicoAutos.getAuthHeaders(),
-      }
+    const data = await window.TicoAutos.graphqlRequest(
+      CONVERSATION_QUERY,
+      { id: conversationId },
+      { auth: true }
     );
-    const data = await response.json().catch(() => ({}));
+    const conversation = data.conversation;
 
-    if (!response.ok) {
-      throw new Error(data.message || "No fue posible cargar el historial de la conversacion.");
+    if (!conversation) {
+      throw new Error("No fue posible cargar el historial de la conversacion.");
     }
 
-    const vehicle = data.vehicle || {};
-    const otherUser = data.otherUser || {};
-    const questions = data.results || [];
+    const vehicle = conversation.vehicle || {};
+    const otherUser = conversation.otherUser || {};
+    const questions = conversation.results || [];
 
     historyHeader.innerHTML = `
       <div class="section-head">
@@ -86,7 +121,7 @@ const loadHistory = async () => {
         </div>
         <div class="inline-actions">
           <a class="btn btn-outline" href="./chat.html?conversationId=${conversationId}">Volver al chat</a>
-          <a class="btn btn-outline" href="./vehicle.html?id=${vehicle._id}">Ver vehiculo</a>
+          <a class="btn btn-outline" href="./vehicle.html?id=${vehicle.id}">Ver vehiculo</a>
         </div>
       </div>
     `;

@@ -3,6 +3,55 @@ window.TicoAutos.bindNavigation();
 const form = document.getElementById("catalogFilters");
 const summary = document.getElementById("catalogSummary");
 const list = document.getElementById("catalogList");
+const VEHICLES_QUERY = `
+  query GetVehicles(
+    $brand: String
+    $model: String
+    $status: String
+    $minYear: Int
+    $maxYear: Int
+    $minPrice: Float
+    $maxPrice: Float
+    $page: Int
+    $limit: Int
+  ) {
+    vehicles(
+      brand: $brand
+      model: $model
+      status: $status
+      minYear: $minYear
+      maxYear: $maxYear
+      minPrice: $minPrice
+      maxPrice: $maxPrice
+      page: $page
+      limit: $limit
+    ) {
+      vehicles {
+        id
+        userId
+        brand
+        model
+        year
+        price
+        color
+        location
+        description
+        status
+        images
+        owner {
+          id
+          name
+          lastname
+          email
+        }
+      }
+      total
+      page
+      limit
+      totalPages
+    }
+  }
+`;
 
 // Lee los filtros del formulario y los convierte en query params.
 const readFilters = () => {
@@ -72,13 +121,13 @@ const renderVehicles = (vehicles, currentUserId) => {
   }
 
   vehicles.forEach((vehicle) => {
-    const ownerId = vehicle.owner?._id || vehicle.userId?._id;
+    const ownerId = vehicle.owner?.id || vehicle.owner?._id || vehicle.userId;
     const isOwner = Boolean(currentUserId && ownerId === currentUserId);
 
     const card = window.TicoAutos.createCatalogVehicleCard(vehicle, {
       isOwner,
       onEdit: (item) => {
-        window.location.href = `./editVehicle.html?id=${item._id}`;
+        window.location.href = `./editVehicle.html?id=${window.TicoAutos.getEntityId(item)}`;
       },
       onDelete: async (item) => {
         const confirmed = window.confirm("Seguro que deseas eliminar este vehiculo?");
@@ -87,7 +136,7 @@ const renderVehicles = (vehicles, currentUserId) => {
         }
 
         try {
-          await deleteVehicleRequest(item._id);
+          await deleteVehicleRequest(window.TicoAutos.getEntityId(item));
           loadVehicles(readFilters());
         } catch (error) {
           window.alert(error.message || "No se pudo eliminar");
@@ -100,7 +149,7 @@ const renderVehicles = (vehicles, currentUserId) => {
         const nextStatus = item.status === "vendido" ? "disponible" : "vendido";
 
         try {
-          await updateVehicleStatusRequest(item._id, nextStatus);
+          await updateVehicleStatusRequest(window.TicoAutos.getEntityId(item), nextStatus);
           loadVehicles(readFilters());
         } catch (error) {
           window.alert(error.message || "No se pudo actualizar el estado");
@@ -120,15 +169,20 @@ const loadVehicles = async (params = readFilters()) => {
   try {
     const currentUserId = await window.TicoAutos.syncSessionUser();
     const query = params.toString();
-    const response = await fetch(`${window.TicoAutos.API_BASE}/api/vehicles${query ? `?${query}` : ""}`);
-    const data = await response.json().catch(() => ({}));
+    const data = await window.TicoAutos.graphqlRequest(VEHICLES_QUERY, {
+      brand: params.get("brand") || null,
+      model: params.get("model") || null,
+      status: params.get("status") || null,
+      minYear: params.get("minYear") ? Number(params.get("minYear")) : null,
+      maxYear: params.get("maxYear") ? Number(params.get("maxYear")) : null,
+      minPrice: params.get("minPrice") ? Number(params.get("minPrice")) : null,
+      maxPrice: params.get("maxPrice") ? Number(params.get("maxPrice")) : null,
+      page: params.get("page") ? Number(params.get("page")) : 1,
+      limit: params.get("limit") ? Number(params.get("limit")) : 12,
+    });
 
-    if (!response.ok) {
-      throw new Error(data.message || "No se pudo cargar el catalogo");
-    }
-
-    const results = data.results || [];
-    summary.textContent = `${data.total || results.length} vehiculos encontrados`;
+    const results = data.vehicles?.vehicles || [];
+    summary.textContent = `${data.vehicles?.total || results.length} vehiculos encontrados`;
     renderVehicles(results, currentUserId);
 
     const nextUrl = query ? `./index.html?${query}#catalogo` : "./index.html#catalogo";

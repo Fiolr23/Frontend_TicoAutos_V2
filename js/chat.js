@@ -1,20 +1,70 @@
-// Redirige al login si el usuario no está autenticado.
 if (!window.TicoAutos.isAuthenticated()) {
   window.location.href = "./login.html";
 }
 
-// Activa la navegación general del sistema.
 window.TicoAutos.bindNavigation();
 
-// Obtiene parámetros desde la URL.
 const params = new URLSearchParams(window.location.search);
 let conversationId = params.get("conversationId");
 let vehicleId = params.get("vehicleId") || params.get("id");
 
 const chatHeader = document.getElementById("chatHeader");
 const chatThread = document.getElementById("chatThread");
+const CONVERSATION_QUERY = `
+  query GetConversation($id: ID!) {
+    conversation(id: $id) {
+      id
+      isOwner
+      canAsk
+      vehicle {
+        id
+        brand
+        model
+      }
+      otherUser {
+        id
+        name
+        lastname
+      }
+      results {
+        id
+        questionText
+        answerText
+        status
+        askedAt
+        answeredAt
+      }
+    }
+  }
+`;
+const VEHICLE_CONVERSATION_QUERY = `
+  query GetVehicleConversation($vehicleId: ID!) {
+    vehicleConversation(vehicleId: $vehicleId) {
+      id
+      isOwner
+      canAsk
+      vehicle {
+        id
+        brand
+        model
+      }
+      otherUser {
+        id
+        name
+        lastname
+      }
+      results {
+        id
+        questionText
+        answerText
+        status
+        askedAt
+        answeredAt
+      }
+    }
+  }
+`;
 
-// Formatea fechas al formato local de Costa Rica.
 const formatDate = (value) => {
   if (!value) return "Sin registro";
 
@@ -24,14 +74,13 @@ const formatDate = (value) => {
   }).format(new Date(value));
 };
 
-// Muestra mensajes de estado en el DOM.
 const setMessage = (element, text, type = "") => {
   if (!element) return;
   element.textContent = text;
   element.className = `msg ${type}`.trim();
 };
 
-// Actualiza la URL del navegador con el conversationId.
+// Actualiza la URL cuando ya existe una conversacion real.
 const updateUrl = () => {
   if (!conversationId) return;
 
@@ -42,7 +91,6 @@ const updateUrl = () => {
   window.history.replaceState({}, "", `${url.pathname}${url.search}`);
 };
 
-// Genera una burbuja de mensaje (pregunta o respuesta).
 const bubble = (text, date, direction, status = "") => `
   <div class="chat-message ${direction}">
     <div class="chat-bubble">
@@ -55,7 +103,6 @@ const bubble = (text, date, direction, status = "") => `
   </div>
 `;
 
-// Renderiza todos los mensajes del chat.
 const renderMessages = (questions, isOwner) => {
   if (!questions.length) {
     return '<div class="empty-state">Todavia no existen mensajes en este chat.</div>';
@@ -63,7 +110,6 @@ const renderMessages = (questions, isOwner) => {
 
   return questions
     .map((question) => {
-      // Burbuja de la pregunta.
       const questionHtml = bubble(
         question.questionText,
         question.askedAt,
@@ -71,7 +117,6 @@ const renderMessages = (questions, isOwner) => {
         question.status === "pending" ? "Pendiente" : "Respondida"
       );
 
-      // Burbuja de la respuesta (si existe).
       const answerHtml =
         question.status === "answered"
           ? bubble(
@@ -86,25 +131,9 @@ const renderMessages = (questions, isOwner) => {
     .join("");
 };
 
-// Determina el endpoint según el tipo de chat.
-const getEndpoint = () => {
-  if (conversationId) {
-    return `${window.TicoAutos.API_BASE}/api/questions/conversations/${conversationId}/messages`;
-  }
-
-  if (vehicleId) {
-    return `${window.TicoAutos.API_BASE}/api/questions/vehicle/${vehicleId}/conversation`;
-  }
-
-  return null;
-};
-
-// Carga la información completa del chat.
+// Carga la informacion del chat usando GraphQL.
 const loadChat = async () => {
-  const endpoint = getEndpoint();
-
-  // Si no hay endpoint válido, muestra error.
-  if (!endpoint) {
+  if (!conversationId && !vehicleId) {
     chatHeader.innerHTML = '<div class="empty-state">No fue posible identificar el chat solicitado.</div>';
     chatThread.innerHTML = "";
     return;
@@ -114,40 +143,41 @@ const loadChat = async () => {
   chatThread.innerHTML = "";
 
   try {
-    const response = await fetch(endpoint, {
-      headers: window.TicoAutos.getAuthHeaders(),
-    });
+    const data = conversationId
+      ? await window.TicoAutos.graphqlRequest(
+          CONVERSATION_QUERY,
+          { id: conversationId },
+          { auth: true }
+        )
+      : await window.TicoAutos.graphqlRequest(
+          VEHICLE_CONVERSATION_QUERY,
+          { vehicleId },
+          { auth: true }
+        );
 
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      throw new Error(data.message || "No fue posible cargar el chat.");
+    const conversation = conversationId ? data.conversation : data.vehicleConversation;
+    if (!conversation) {
+      throw new Error("No fue posible cargar el chat.");
     }
 
-    const conversation = data.conversation || null;
-    const vehicle = data.vehicle || {};
-    const otherUser = data.otherUser || {};
-    const isOwner = Boolean(data.isOwner);
-    const questions = data.results || [];
+    const vehicle = conversation.vehicle || {};
+    const otherUser = conversation.otherUser || {};
+    const isOwner = Boolean(conversation.isOwner);
+    const questions = conversation.results || [];
 
-    // Actualiza el conversationId si viene del backend.
-    if (conversation?._id) {
-      conversationId = conversation._id;
+    if (conversation.id) {
+      conversationId = conversation.id;
       updateUrl();
     }
 
-    // Actualiza el vehicleId si viene del backend.
-    if (vehicle?._id) {
-      vehicleId = vehicle._id;
+    if (vehicle.id) {
+      vehicleId = vehicle.id;
     }
 
     const userName = `${otherUser.name || ""} ${otherUser.lastname || ""}`.trim() || "Usuario";
     const vehicleName = `${vehicle.brand || "Vehiculo"} ${vehicle.model || ""}`.trim();
-
-    // Busca la última pregunta pendiente.
     const pendingQuestion = [...questions].reverse().find((question) => question.status === "pending");
 
-    // Renderiza el encabezado del chat.
     chatHeader.innerHTML = `
       <div class="chat-topbar">
         <div class="chat-topbar-avatar">${userName.charAt(0).toUpperCase()}</div>
@@ -166,7 +196,6 @@ const loadChat = async () => {
       </div>
     `;
 
-    // Renderiza mensajes y formulario según el rol del usuario.
     chatThread.innerHTML = `
       <div class="chat-shell">
         <div class="chat-messages">
@@ -177,7 +206,7 @@ const loadChat = async () => {
             isOwner
               ? pendingQuestion
                 ? `
-                  <form id="chatForm" class="chat-composer" data-mode="answer" data-question-id="${pendingQuestion._id}">
+                  <form id="chatForm" class="chat-composer" data-mode="answer" data-question-id="${pendingQuestion.id}">
                     <textarea name="text" rows="2" placeholder="Escribe tu respuesta..." required></textarea>
                     <button class="btn btn-primary" type="submit">Enviar</button>
                     <p class="msg" id="chatMsg" aria-live="polite"></p>
@@ -190,16 +219,16 @@ const loadChat = async () => {
                     name="text"
                     rows="2"
                     placeholder="Escribe tu mensaje..."
-                    ${data.canAsk ? "" : "disabled"}
+                    ${conversation.canAsk ? "" : "disabled"}
                     required
                   ></textarea>
-                  <button class="btn btn-primary" type="submit" ${data.canAsk ? "" : "disabled"}>
+                  <button class="btn btn-primary" type="submit" ${conversation.canAsk ? "" : "disabled"}>
                     Enviar
                   </button>
                   <p class="msg" id="chatMsg" aria-live="polite"></p>
                 </form>
                 ${
-                  data.canAsk
+                  conversation.canAsk
                     ? ""
                     : '<div class="chat-composer-disabled">Debes esperar la respuesta del propietario antes de volver a preguntar.</div>'
                 }
@@ -214,7 +243,7 @@ const loadChat = async () => {
 
     if (!form) return;
 
-    // Maneja el envío de mensajes (pregunta o respuesta).
+    // Los envios siguen usando REST.
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
 
@@ -228,12 +257,9 @@ const loadChat = async () => {
 
       try {
         const isAnswer = form.dataset.mode === "answer";
-
-        // Define endpoint y cuerpo según el tipo de mensaje.
         const url = isAnswer
           ? `${window.TicoAutos.API_BASE}/api/questions/${form.dataset.questionId}/answer`
           : `${window.TicoAutos.API_BASE}/api/questions/vehicle/${vehicleId}`;
-
         const body = isAnswer ? { answerText: text } : { questionText: text };
 
         const sendResponse = await fetch(url, {
@@ -244,20 +270,17 @@ const loadChat = async () => {
           },
           body: JSON.stringify(body),
         });
-
         const sendData = await sendResponse.json().catch(() => ({}));
 
         if (!sendResponse.ok) {
           throw new Error(sendData.message || "No fue posible enviar el mensaje.");
         }
 
-        // Actualiza el conversationId si se crea una nueva conversación.
         if (sendData.conversationId) {
           conversationId = sendData.conversationId;
           updateUrl();
         }
 
-        // Recarga el chat para reflejar cambios.
         await loadChat();
       } catch (error) {
         setMessage(msg, error.message || "No fue posible enviar el mensaje.", "err");

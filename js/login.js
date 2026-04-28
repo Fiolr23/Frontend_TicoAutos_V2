@@ -4,71 +4,83 @@ const API_BASE = "http://localhost:3000";
 // Client ID de Google necesario para usar Google Identity Services
 const GOOGLE_CLIENT_ID = "768296011477-csncaoc4p90t2ra4b3kjtmts59n1o68r.apps.googleusercontent.com";
 
-// Referencias a elementos del DOM (formulario, mensajes, botones)
+// Referencias a elementos del DOM
 const form = document.getElementById("loginForm");
 const msg = document.getElementById("msg");
 const btn = document.getElementById("btnLogin");
 const googleLoginBtn = document.getElementById("googleLoginBtn");
 
+// Elementos del formulario 2FA.
+const twoFactorForm = document.getElementById("twoFactorForm");
+const twoFactorCodeInput = document.getElementById("twoFactorCode");
+const btnVerify2FA = document.getElementById("btnVerify2FA");
+const btnBackLogin = document.getElementById("btnBackLogin");
+
+// Guarda temporalmente el usuario que esta esperando 2FA.
+let pendingTwoFactorUserId = "";
+
 // Clave para guardar temporalmente el token de Google cuando falta validar cédula
 const PENDING_GOOGLE_CREDENTIAL_KEY = "pendingGoogleCredential";
 
-// Función para mostrar mensajes en pantalla (errores o éxito)
+// Asegura que al inicio solo se vea el login normal.
+form.style.display = "grid";
+twoFactorForm.style.display = "none";
+
+// Función para mostrar mensajes en pantalla
 function setMsg(text, type) {
   msg.textContent = text;
   msg.className = `msg ${type || ""}`.trim();
 }
 
+function showTwoFactorForm(userId) {
+  // Guarda el usuario pendiente y muestra solo el formulario 2FA.
+  pendingTwoFactorUserId = userId;
+  form.style.display = "none";
+  twoFactorForm.style.display = "grid";
+  twoFactorCodeInput.value = "";
+  twoFactorCodeInput.focus();
+}
+
+function showLoginForm() {
+  // Cancela el intento 2FA y vuelve al login normal.
+  pendingTwoFactorUserId = "";
+  twoFactorForm.style.display = "none";
+  form.style.display = "grid";
+}
+
 // Muestra mensajes cuando el usuario vuelve desde el link de verificacion
 function showVerificationMessageFromUrl() {
-  // Lee los parametros de la URL actual
   const params = new URLSearchParams(window.location.search);
-
-  // Obtiene si la verificacion fue exitosa o no
   const verified = params.get("verified");
-
-  // Obtiene la razon del error si existe
   const reason = params.get("reason");
 
-  // Si verified vale 1, muestra mensaje de exito
   if (verified === "1") {
     setMsg("Correo verificado correctamente. Ya puedes iniciar sesion.", "ok");
   }
 
-  // Si verified vale 0, muestra el error correspondiente
   if (verified === "0") {
-    // Mensaje por defecto
     let message = "No se pudo verificar el correo.";
 
-    // Si falta el token en la URL
     if (reason === "missing") {
       message = "El enlace de verificacion es invalido.";
-    }
-    // Si el token no existe, ya fue usado o no coincide
-    else if (reason === "invalid") {
+    } else if (reason === "invalid") {
       message = "El token de verificacion no existe, ya fue usado o no es valido.";
-    }
-    // Si el token ya vencio
-    else if (reason === "expired") {
+    } else if (reason === "expired") {
       message = "El enlace de verificacion vencio.";
     }
 
-    // Muestra el mensaje final
     setMsg(message, "err");
   }
 
-  // Limpia la URL para que el mensaje no se repita al recargar
   if (verified) {
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 }
 
-
-// Guarda la sesión del usuario en el navegador (token + userId)
+// Guarda la sesión del usuario en el navegador
 function saveAuthSession(data) {
   sessionStorage.setItem("token", data.token);
 
-  // Guardamos el ID del usuario si viene en la respuesta
   if (data.user?.id) {
     sessionStorage.setItem("userId", data.user.id);
   }
@@ -84,7 +96,7 @@ function savePendingGoogle(credential) {
   sessionStorage.setItem(PENDING_GOOGLE_CREDENTIAL_KEY, credential);
 }
 
-// Recupera el último correo usado (mejora de experiencia de usuario)
+// Recupera el último correo usado
 const lastEmail = sessionStorage.getItem("lastEmail");
 if (lastEmail) {
   document.getElementById("email").value = lastEmail;
@@ -95,7 +107,6 @@ async function handleGoogleResponse(response) {
   setMsg("");
 
   try {
-    // Se envía el credential de Google al backend para validarlo
     const resp = await fetch(`${API_BASE}/api/auth/google`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -104,19 +115,17 @@ async function handleGoogleResponse(response) {
 
     const data = await resp.json().catch(() => ({}));
 
-    // Si el backend responde con error
     if (!resp.ok) {
       return setMsg(data.message || "No se pudo iniciar con Google", "err");
     }
 
-    // Caso 1: Login completo con Google (usuario ya existía y tenía cédula)
+    // Google sigue entrando directo si el backend devuelve token.
     if (data.token) {
-      clearPendingGoogle(); // limpiamos cualquier estado pendiente
-      saveAuthSession(data); // guardamos sesión
+      clearPendingGoogle();
+      saveAuthSession(data);
 
       setMsg("Login con Google exitoso", "ok");
 
-      // Redirige al home
       setTimeout(() => {
         window.location.href = "./index.html";
       }, 800);
@@ -124,14 +133,12 @@ async function handleGoogleResponse(response) {
       return;
     }
 
-    // Caso 2: Usuario nuevo con Google → necesita validar cédula
+    // Si Google necesita cédula, se manda al registro.
     if (data.needsCedula) {
-      // Guardamos el credential de Google temporalmente
       savePendingGoogle(response.credential);
 
       setMsg("Tu cuenta de Google fue verificada. Ahora debes validar la cedula.", "ok");
 
-      // Redirige al registro para completar solo la cédula
       setTimeout(() => {
         window.location.href = "./register.html";
       }, 800);
@@ -142,27 +149,23 @@ async function handleGoogleResponse(response) {
   }
 }
 
-// Inicializa el botón de Google Login usando Google Identity Services
+// Inicializa el botón de Google Login
 function initGoogleLogin() {
-  // Validación: asegurarse de que el Client ID esté configurado
   if (GOOGLE_CLIENT_ID === "TU_CLIENT_ID_DE_GOOGLE") {
     setMsg("Falta configurar el Client ID de Google en login.js", "err");
     return;
   }
 
-  // Verifica que la librería de Google se haya cargado correctamente
   if (!window.google?.accounts?.id) {
     setMsg("No se pudo cargar Google Identity Services", "err");
     return;
   }
 
-  // Inicializa Google con el Client ID y el callback
   google.accounts.id.initialize({
     client_id: GOOGLE_CLIENT_ID,
-    callback: handleGoogleResponse, // función que se ejecuta al autenticarse
+    callback: handleGoogleResponse,
   });
 
-  // Renderiza el botón de Google en el frontend
   google.accounts.id.renderButton(googleLoginBtn, {
     theme: "outline",
     size: "large",
@@ -172,25 +175,21 @@ function initGoogleLogin() {
   });
 }
 
-// Evento del formulario de login tradicional (correo + contraseña)
+// Login tradicional con correo y contraseña
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   setMsg("");
 
-  // Obtiene los datos del formulario
   const email = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value;
 
-  // Validaciones básicas
   if (!email.includes("@")) return setMsg("Correo invalido", "err");
   if (password.length < 6) return setMsg("Contrasena minima 6 caracteres", "err");
 
-  // Desactiva botón mientras se procesa
   btn.disabled = true;
   btn.textContent = "Ingresando...";
 
   try {
-    // Petición al backend para login normal
     const resp = await fetch(`${API_BASE}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -199,18 +198,20 @@ form.addEventListener("submit", async (e) => {
 
     const data = await resp.json().catch(() => ({}));
 
-    // Manejo de error
     if (!resp.ok) return setMsg(data.message || "Error en login", "err");
 
-    // Limpia estado de Google por si acaso
-    clearPendingGoogle();
+    // Si el backend pide 2FA, se muestra la seccion del codigo.
+    if (data.requiresTwoFactor) {
+      showTwoFactorForm(data.userId);
+      setMsg(data.message || "Codigo enviado por SMS", "ok");
+      return;
+    }
 
-    // Guarda sesión
+    clearPendingGoogle();
     saveAuthSession(data);
 
     setMsg("Login exitoso", "ok");
 
-    // Redirección al home
     setTimeout(() => {
       window.location.href = "./index.html";
     }, 800);
@@ -218,13 +219,72 @@ form.addEventListener("submit", async (e) => {
     console.error(error);
     setMsg("No se pudo conectar con el servidor", "err");
   } finally {
-    // Reactiva botón
     btn.disabled = false;
     btn.textContent = "Iniciar sesion";
   }
 });
 
-// Revisa si venimos del link de verificacion y muestra el mensaje correspondiente
+twoFactorCodeInput.addEventListener("input", () => {
+  // Permite solo numeros y maximo 6 digitos.
+  twoFactorCodeInput.value = twoFactorCodeInput.value.replace(/\D/g, "").slice(0, 6);
+});
+
+btnBackLogin.addEventListener("click", () => {
+  // Vuelve al login normal sin guardar token.
+  showLoginForm();
+  setMsg("");
+});
+
+twoFactorForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const code = twoFactorCodeInput.value.trim();
+
+  if (!pendingTwoFactorUserId) {
+    return setMsg("No hay login pendiente de 2FA", "err");
+  }
+
+  if (!/^\d{6}$/.test(code)) {
+    return setMsg("El codigo debe tener 6 digitos", "err");
+  }
+
+  btnVerify2FA.disabled = true;
+  btnVerify2FA.textContent = "Verificando...";
+
+  try {
+    const resp = await fetch(`${API_BASE}/api/auth/2fa/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: pendingTwoFactorUserId,
+        code
+      }),
+    });
+
+    const data = await resp.json().catch(() => ({}));
+
+    if (!resp.ok) {
+      return setMsg(data.message || "Codigo incorrecto o vencido", "err");
+    }
+
+    clearPendingGoogle();
+    saveAuthSession(data);
+
+    setMsg("Login exitoso", "ok");
+
+    setTimeout(() => {
+      window.location.href = "./index.html";
+    }, 800);
+  } catch (error) {
+    console.error(error);
+    setMsg("No se pudo conectar con el servidor", "err");
+  } finally {
+    btnVerify2FA.disabled = false;
+    btnVerify2FA.textContent = "Verificar codigo";
+  }
+});
+
+// Revisa si venimos del link de verificacion
 showVerificationMessageFromUrl();
 
 // Inicializa Google Login al cargar la página

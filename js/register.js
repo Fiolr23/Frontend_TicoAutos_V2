@@ -20,9 +20,15 @@ const apellidoMaternoInput = document.getElementById("apellidoMaterno");
 const emailInput = document.getElementById("email");
 const passwordInput = document.getElementById("password");
 
+// Telefono requerido para enviar codigo 2FA.
+const phoneInput = document.getElementById("phone");
+
 // Grupos para ocultar/mostrar email y password
 const emailGroup = emailInput.closest("label");
 const passwordGroup = passwordInput.closest("label");
+
+// Grupo del telefono para ocultarlo en modo Google.
+const phoneGroup = phoneInput.closest("label");
 
 // Clave para guardar temporalmente credencial de Google
 const PENDING_GOOGLE_CREDENTIAL_KEY = "pendingGoogleCredential";
@@ -50,6 +56,11 @@ function clearPadronFields() {
 // Valida que la cédula tenga exactamente 9 dígitos
 function isValidCedula(cedula) {
   return /^\d{9}$/.test(cedula);
+}
+
+// Valida telefono de Costa Rica: solo 8 digitos.
+function isValidPhone(phone) {
+  return /^\d{8}$/.test(phone);
 }
 
 // Guarda la sesión del usuario (token + id)
@@ -100,6 +111,12 @@ function enableGoogleMode() {
   passwordGroup.hidden = true;
   passwordGroup.style.display = "none";
 
+  // Google no usa 2FA por SMS, por eso no pide telefono.
+  phoneInput.value = "";
+  phoneInput.required = false;
+  phoneGroup.hidden = true;
+  phoneGroup.style.display = "none";
+
   // Cambia texto del botón
   btnRegister.textContent = getRegisterButtonText();
 
@@ -115,9 +132,16 @@ function disableGoogleMode() {
   emailInput.required = true;
   emailGroup.hidden = false;
   emailGroup.style.display = "";
+
   passwordInput.required = true;
   passwordGroup.hidden = false;
   passwordGroup.style.display = "";
+
+  // En registro normal el telefono si es obligatorio.
+  phoneInput.required = true;
+  phoneGroup.hidden = false;
+  phoneGroup.style.display = "";
+
   googleModeHint.hidden = true;
   btnRegister.textContent = getRegisterButtonText();
 }
@@ -142,6 +166,12 @@ cedulaInput.addEventListener("input", () => {
   if (validatedCedula && validatedCedula !== onlyDigits) {
     clearPadronFields();
   }
+});
+
+// Evento cuando se escribe en el telefono
+phoneInput.addEventListener("input", () => {
+  // Solo permite números y máximo 8 dígitos.
+  phoneInput.value = phoneInput.value.replace(/\D/g, "").slice(0, 8);
 });
 
 // Botón para validar cédula contra el API (padrón)
@@ -223,7 +253,7 @@ async function handleGoogleResponse(response) {
     if (data.needsCedula) {
       savePendingGoogle(response.credential);
 
-      // Activa modo Google (oculta email/password)
+      // Activa modo Google (oculta email/password/telefono)
       enableGoogleMode();
 
       setMsg("Cuenta de Google verificada. Ahora valida la cedula para registrarte.", "ok");
@@ -272,6 +302,9 @@ form.addEventListener("submit", async (e) => {
   const email = emailInput.value.trim();
   const password = passwordInput.value;
 
+  // Telefono nacional de 8 digitos. El backend le agrega +506.
+  const phone = phoneInput.value.trim();
+
   // Validaciones
   if (!isValidCedula(cedula)) {
     return setMsg("La cedula debe tener exactamente 9 digitos", "err");
@@ -293,6 +326,11 @@ form.addEventListener("submit", async (e) => {
     return setMsg("Contrasena minima 6 caracteres", "err");
   }
 
+  // En modo normal el telefono es obligatorio para 2FA.
+  if (!isGoogleMode() && !isValidPhone(phone)) {
+    return setMsg("El telefono debe tener exactamente 8 digitos. Ejemplo: 86488491", "err");
+  }
+
   btnRegister.disabled = true;
   btnRegister.textContent = "Procesando...";
 
@@ -304,7 +342,7 @@ form.addEventListener("submit", async (e) => {
       resp = await fetch(`${API_BASE}/api/users/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cedula, email, password }),
+        body: JSON.stringify({ cedula, email, password, phone }),
       });
     } 
     // Registro con Google (solo cedula + credential)

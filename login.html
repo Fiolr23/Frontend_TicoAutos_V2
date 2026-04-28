@@ -26,12 +26,34 @@
       <p class="hint">o entra con Google</p>
       <div id="googleLoginBtn"></div>
 
-      <p id="msg" class="msg" aria-live="polite"></p>
-
       <p class="hint">
         No tienes cuenta? <a href="./register.html">Registrate</a>
       </p>
     </form>
+
+    <!-- Esta seccion inicia oculta y solo aparece cuando el backend pide 2FA. -->
+    <form id="twoFactorForm" class="card" style="display: none;">
+      <p class="hint">Escribe el codigo de 6 digitos enviado por SMS.</p>
+
+      <label>
+        Codigo 2FA
+        <input
+          type="text"
+          id="twoFactorCode"
+          required
+          minlength="6"
+          maxlength="6"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+        />
+      </label>
+
+      <button type="submit" id="btnVerify2FA">Verificar codigo</button>
+      <button type="button" id="btnBackLogin">Volver al login</button>
+    </form>
+
+    <!-- Mensaje general para login y 2FA. -->
+    <p id="msg" class="msg" aria-live="polite"></p>
   </main>
 
   <script src="https://accounts.google.com/gsi/client"></script>

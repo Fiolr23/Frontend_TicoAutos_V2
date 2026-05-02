@@ -12,6 +12,32 @@ const msg = document.getElementById("vehicleMsg");
 const submitButton = document.getElementById("vehicleSubmit");
 const imageList = document.getElementById("currentImages");
 const title = document.getElementById("editorTitle");
+const VEHICLE_QUERY = `
+  query GetVehicleForEdit($id: ID!) {
+    vehicle(id: $id) {
+      id
+      userId
+      brand
+      model
+      year
+      price
+      color
+      mileage
+      transmission
+      fuelType
+      location
+      description
+      status
+      images
+      owner {
+        id
+        name
+        lastname
+        email
+      }
+    }
+  }
+`;
 
 // Muestra mensajes del formulario.
 const setMsg = (text, type = "") => {
@@ -56,16 +82,14 @@ const fillForm = (vehicle) => {
   renderCurrentImages(vehicle.images || []);
 };
 
-// GET /api/vehicles/:id
+// La pantalla de edicion solo usa GraphQL para cargar el estado inicial.
 const fetchVehicleById = async () => {
-  const response = await fetch(`${window.TicoAutos.API_BASE}/api/vehicles/${vehicleId}`);
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new Error(data.message || "No se pudo cargar el vehiculo");
+  const data = await window.TicoAutos.graphqlRequest(VEHICLE_QUERY, { id: vehicleId });
+  if (!data.vehicle) {
+    throw new Error("No se pudo cargar el vehiculo");
   }
 
-  return data;
+  return data.vehicle;
 };
 
 // PUT /api/vehicles/:id
@@ -96,9 +120,9 @@ const loadVehicle = async () => {
   try {
     const vehicle = await fetchVehicleById();
 
-    const owner = vehicle.owner || vehicle.userId;
+    const ownerId = vehicle.owner?.id || vehicle.userId;
     const currentUserId = await window.TicoAutos.syncSessionUser();
-    if (currentUserId !== owner?._id) {
+    if (currentUserId !== ownerId) {
       throw new Error("Solo el propietario puede editar esta publicacion");
     }
 

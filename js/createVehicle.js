@@ -7,6 +7,8 @@ window.TicoAutos.bindNavigation();
 const form = document.getElementById("vehicleForm");
 const msg = document.getElementById("vehicleMsg");
 const submitButton = document.getElementById("vehicleSubmit");
+const successSummary = document.getElementById("vehicleSuccessSummary");
+const successActions = document.getElementById("vehicleSuccessActions");
 
 /**
  * Muestra mensajes de estado reutilizando el sistema visual del formulario.
@@ -14,6 +16,50 @@ const submitButton = document.getElementById("vehicleSubmit");
 const setMsg = (text, type = "") => {
   msg.textContent = text;
   msg.className = `msg ${type}`.trim();
+};
+
+/**
+ * Evita redirecciones inmediatas para que la solicitud REST pueda revisarse con calma en Network.
+ */
+const renderSuccessState = (vehicle) => {
+  const vehicleId = vehicle?._id || vehicle?.id || "";
+  successSummary.hidden = false;
+  successSummary.innerHTML = `
+    <span class="eyebrow">Creado correctamente</span>
+    <h3>${window.TicoAutos.escapeHtml(vehicle?.brand || "Vehiculo")} ${window.TicoAutos.escapeHtml(vehicle?.model || "")}</h3>
+    <p class="page-subtitle">La publicacion se guardo correctamente en el backend principal.</p>
+    <div class="spec-grid">
+      <div class="spec-item">
+        <span>Metodo usado</span>
+        <strong>REST</strong>
+      </div>
+      <div class="spec-item">
+        <span>Endpoint</span>
+        <strong>POST /api/vehicles</strong>
+      </div>
+      <div class="spec-item">
+        <span>ID generado</span>
+        <strong>${window.TicoAutos.escapeHtml(vehicleId || "No disponible")}</strong>
+      </div>
+    </div>
+  `;
+
+  successActions.hidden = false;
+  successActions.innerHTML = `
+    <a class="btn btn-primary" href="./vehicle.html?id=${vehicleId}">Ver publicacion</a>
+    <a class="btn btn-outline" href="./myVehicles.html">Ir a mis vehiculos</a>
+    <button class="btn btn-muted" type="button" id="publishAnotherVehicle">Publicar otro</button>
+  `;
+
+  successActions.querySelector("#publishAnotherVehicle")?.addEventListener("click", () => {
+    form.reset();
+    successSummary.hidden = true;
+    successSummary.innerHTML = "";
+    successActions.hidden = true;
+    successActions.innerHTML = "";
+    setMsg("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
 };
 
 /**
@@ -59,6 +105,10 @@ const validateVehicleForm = (formElement) => {
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   setMsg("");
+  successSummary.hidden = true;
+  successSummary.innerHTML = "";
+  successActions.hidden = true;
+  successActions.innerHTML = "";
 
   const validationError = validateVehicleForm(form);
   if (validationError) {
@@ -86,10 +136,8 @@ form.addEventListener("submit", async (event) => {
       throw new Error(data.message || "No se pudo publicar el vehiculo");
     }
 
-    setMsg("Se creo satisfactoriamente el vehiculo.", "ok");
-    window.setTimeout(() => {
-      window.location.href = `./vehicle.html?id=${data._id}`;
-    }, 2200);
+    setMsg("Vehiculo creado correctamente.", "ok");
+    renderSuccessState(data);
   } catch (error) {
     console.error(error);
     setMsg(error.message || "No se pudo publicar el vehiculo", "err");

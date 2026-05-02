@@ -1,5 +1,5 @@
 const API_BASE = "http://localhost:3000";
-const GRAPHQL_URL = `${API_BASE}/graphql`;
+const GRAPHQL_BASE = "http://localhost:4000/graphql";
 const PLACEHOLDER_IMAGE =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 520'%3E%3Crect width='800' height='520' fill='%230e2433'/%3E%3Cpath d='M145 330h40l38-92h257l56 92h84' fill='none' stroke='%23f4c95d' stroke-width='18' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='250' cy='350' r='34' fill='%23f4c95d'/%3E%3Ccircle cx='542' cy='350' r='34' fill='%23f4c95d'/%3E%3Ctext x='50%25' y='120' dominant-baseline='middle' text-anchor='middle' fill='white' font-family='Verdana' font-size='42'%3ETicoAutos%3C/text%3E%3C/svg%3E";
 
@@ -40,7 +40,7 @@ const getAuthHeaders = (headers = {}) => {
   return token ? { ...headers, Authorization: `Bearer ${token}` } : headers;
 };
 
-// Hace una consulta simple a /graphql con o sin token.
+// GraphQL vive en un servicio separado y comparte el mismo token JWT del backend REST.
 const graphqlRequest = async (query, variables = {}, options = {}) => {
   const headers = { "Content-Type": "application/json" };
 
@@ -48,7 +48,7 @@ const graphqlRequest = async (query, variables = {}, options = {}) => {
     Object.assign(headers, getAuthHeaders());
   }
 
-  const response = await fetch(GRAPHQL_URL, {
+  const response = await fetch(GRAPHQL_BASE, {
     method: "POST",
     headers,
     body: JSON.stringify({ query, variables }),
@@ -355,7 +355,7 @@ const createCatalogVehicleCard = (vehicle, options = {}) => {
 // API publica de utilidades compartidas por el frontend.
 window.TicoAutos = {
   API_BASE,
-  GRAPHQL_URL,
+  GRAPHQL_BASE,
   bindNavigation,
   buildImageUrl,
   createCatalogVehicleCard,

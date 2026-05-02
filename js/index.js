@@ -3,6 +3,7 @@ window.TicoAutos.bindNavigation();
 const form = document.getElementById("catalogFilters");
 const summary = document.getElementById("catalogSummary");
 const list = document.getElementById("catalogList");
+let catalogHasLoaded = false;
 const VEHICLES_QUERY = `
   query GetVehicles(
     $brand: String
@@ -52,6 +53,50 @@ const VEHICLES_QUERY = `
     }
   }
 `;
+
+const hasCatalogSearchIntent = () => {
+  const params = new URLSearchParams(window.location.search);
+  return (
+    window.location.hash === "#catalogo" ||
+    ["brand", "model", "minYear", "maxYear", "minPrice", "maxPrice", "status"].some((key) =>
+      params.has(key)
+    )
+  );
+};
+
+const renderCatalogIdleState = () => {
+  summary.textContent = "Consulta las publicaciones disponibles";
+  list.innerHTML = "";
+};
+
+// La pagina principal valida la sesion con REST al cargar para que en Network
+// se vea trafico REST antes de entrar a la seccion de catalogo.
+const loadHomeWithRest = async () => {
+  if (!window.TicoAutos.isAuthenticated()) {
+    renderCatalogIdleState();
+    return;
+  }
+
+  summary.textContent = "Validando sesion con REST...";
+
+  try {
+    const response = await fetch(`${window.TicoAutos.API_BASE}/api/auth/me`, {
+      headers: window.TicoAutos.getAuthHeaders(),
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (response.ok && data.user) {
+      window.TicoAutos.setSessionUser(data.user);
+      summary.textContent = `Bienvenido, ${data.user.name}. Usa "Explorar catalogo" para cargar vehiculos con GraphQL.`;
+      return;
+    }
+
+    summary.textContent = "Consulta las publicaciones disponibles";
+  } catch (error) {
+    console.error("No se pudo validar la sesion inicial por REST:", error);
+    summary.textContent = "Consulta las publicaciones disponibles";
+  }
+};
 
 // Lee los filtros del formulario y los convierte en query params.
 const readFilters = () => {
@@ -163,6 +208,7 @@ const renderVehicles = (vehicles, currentUserId) => {
 
 // GET /api/vehicles
 const loadVehicles = async (params = readFilters()) => {
+  catalogHasLoaded = true;
   list.innerHTML = '<div class="empty-state">Cargando vehiculos...</div>';
   summary.textContent = "Consultando catalogo";
 
@@ -209,9 +255,28 @@ form.addEventListener("reset", () => {
 
 fillFiltersFromUrl();
 
-const initialParams = new URLSearchParams(window.location.search);
-if (!initialParams.has("limit")) {
-  initialParams.set("limit", "12");
-}
+const loadCatalogWhenRequested = () => {
+  if (catalogHasLoaded || !hasCatalogSearchIntent()) {
+    return;
+  }
 
-loadVehicles(initialParams);
+  const initialParams = new URLSearchParams(window.location.search);
+  if (!initialParams.has("limit")) {
+    initialParams.set("limit", "12");
+  }
+
+  loadVehicles(initialParams);
+};
+
+window.addEventListener("hashchange", loadCatalogWhenRequested);
+document.querySelectorAll('a[href="#catalogo"], a[href="./index.html#catalogo"]').forEach((link) => {
+  link.addEventListener("click", () => {
+    window.setTimeout(loadCatalogWhenRequested, 0);
+  });
+});
+
+if (hasCatalogSearchIntent()) {
+  loadCatalogWhenRequested();
+} else {
+  loadHomeWithRest();
+}

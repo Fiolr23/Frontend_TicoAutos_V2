@@ -2,7 +2,7 @@
 const API_BASE = "http://localhost:3000";
 
 // Client ID de Google necesario para usar Google Identity Services
-const GOOGLE_CLIENT_ID = "768296011477-csncaoc4p90t2ra4b3kjtmts59n1o68r.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "270207719324-1bpt318s19001riv71k658umgigqkji2.apps.googleusercontent.com";
 
 // Referencias a elementos del DOM
 const form = document.getElementById("loginForm");

@@ -87,7 +87,7 @@ const loadHomeWithRest = async () => {
 
     if (response.ok && data.user) {
       window.TicoAutos.setSessionUser(data.user);
-      summary.textContent = `Bienvenido, ${data.user.name}. Usa "Explorar catalogo" para cargar vehiculos con GraphQL.`;
+      summary.textContent = "";
       return;
     }
 
